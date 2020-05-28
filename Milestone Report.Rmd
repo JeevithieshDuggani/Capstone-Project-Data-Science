@@ -1,0 +1,201 @@
+---
+title: "Milestone Project"
+author: "Jeevithiesh Duggani"
+date: "27/05/2020"
+output: 
+    html_document:
+        toc: True
+---
+## Abstract
+The aim of the **Capstone Project** is to create a **Shiny App** to predict the next word in a sentence. The goal of this report is to
+
+1. Initialization
+2. Download and extract the datasets
+3. Import the datasets
+5. Perform Exploratory Data Analysis
+4. Clean the datasets
+6. Create and store unigrams, bigrams and trigrams.
+7. Explain the steps to be taken when building the app.
+
+## Initialization
+Import the following libraries
+
+- stringi
+- tm
+- RWeka
+- SnowballC
+- ggplot2
+```{r import libraries, warning = FALSE, message = FALSE} 
+    library(stringi)
+    library(tm)
+    library(RWeka)
+    library(SnowballC)
+    library(ggplot2)
+```
+
+## Dataset Download and Extraction
+The dataset used in this project is [Coursera-Swiftkey Dataset](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip).
+
+If *Coursera-SwiftKey.zip* and *final* are not present in the current working directory, download and extract the datasets.
+```{r download and extract the datasets} 
+    url     <- "http://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip"
+    zipFile <- "Coursera-SwiftKey.zip"
+    dFolder <- "final"
+    if(!(file.exists(zipFile) | file.exists(dFolder))) download.file(url, zipFile) 
+    if(!file.exists(dFolder)) unzip(zipFile)
+    if(file.exists(zipFile)) file.remove(zipFile)
+```
+
+## Import Datasets
+This project deals with the english words. Hence import *en_US.blogs.txt*, *en_US.news.txt* and *en_US.twitter.txt* into `blogData`, `newsData` and `twitterData`.
+```{r import datasets, warning=FALSE} 
+    folder      <- "./final/en_US/"
+    blogData    <- readLines(paste0(folder, "en_US.blogs.txt"),   encoding = "UTF-8", skipNul = TRUE)
+    newsData    <- readLines(paste0(folder, "en_US.news.txt"),    encoding = "UTF-8", skipNul = TRUE)
+    twitterData <- readLines(paste0(folder, "en_US.twitter.txt"), encoding = "UTF-8", skipNul = TRUE)
+```
+
+### Exploratory Data Analysis
+Find the number of words and lines in each dataset.
+```{r dataset exploration} 
+    Exploration <- data.frame(Dataset    = c("blogData", 
+                                             "newsData", 
+                                             "twitterData"),
+                              Lines      = c(length(blogData), 
+                                             length(newsData), 
+                                             length(twitterData)),
+                              Words      = c(sum(stri_count_words(blogData)), 
+                                             sum(stri_count_words(newsData)), 
+                                             sum(stri_count_words(twitterData)))
+                            )
+    Exploration
+```
+
+## Cleaning the Datasets
+The datasets have a large number of values that take too much to process. Hence we sample `1%` of the data, i.e which is `r 8992 + 772 + 23601` lines of data which should turn a reasonable accuracy for the model.
+```{r sampling the data}
+    set.seed(2020)
+    trainData <- c(sample(blogData, 8892), sample(newsData, 772), sample(twitterData, 23601))
+```
+
+```{r helper function for text processing}
+    Textprocessing <- function(x){
+        gsub("http[[:alnum:]]*",'', x)
+        gsub('http\\S+\\s*', '', x) ## Remove URLs
+        gsub('\\b+RT', '', x) ## Remove RT
+        gsub('#\\S+', '', x) ## Remove Hashtags
+        gsub('@\\S+', '', x) ## Remove Mentions
+        gsub('[[:cntrl:]]', '', x) ## Remove Controls and special characters
+        gsub("\\d", '', x) ## Remove Controls and special characters
+        gsub('[[:punct:]]', '', x) ## Remove Punctuations
+        gsub('-', '', x) ## remove hypens
+        gsub("^[[:space:]]*","",x) ## Remove leading whitespaces
+        gsub("[[:space:]]*$","",x) ## Remove trailing whitespaces
+        gsub(' +',' ',x) ## Remove extra whitespaces
+    }
+```
+
+The Cleaning of the Data is done in the following steps.
+
+- Convert the `trainData` into a corpus.
+- Change the case of all the words to lower.
+- Remove all non-words (numbers, special characters, punctuations, additional whitespaces)
+- Remove stop words from the corpus
+- Convert the corpus to a plain text document
+```{r cleaning the data, warning = FALSE}
+    corpus <- Corpus(VectorSource(trainData))
+    
+    corpus <- tm_map(corpus, PlainTextDocument)
+    corpus <- tm_map(corpus, tolower)
+    corpus <- tm_map(corpus, removeNumbers)
+    corpus <- tm_map(corpus, removePunctuation)
+    corpus <- tm_map(corpus, Textprocessing)
+    corpus <- tm_map(corpus, removeWords, stopwords("en"))
+    corpus <- tm_map(corpus, stripWhitespace)
+    
+    corpus <- VCorpus(VectorSource(corpus), readerControl=list(reader=readPlain, language="en"))
+    saveRDS( corpus, 'Corpus.RDS')
+```
+
+## NGram Creation
+Inorder to generate predicition we need to train the model on unigrams, bigrams and trigrams.
+
+### Unigram
+```{r generating unigrams}
+    uniCorpus <- TermDocumentMatrix(corpus)
+    uniCorpus <- removeSparseTerms(uniCorpus, 0.99)
+    unifreq   <- sort(rowSums(as.matrix(uniCorpus)), decreasing = T)
+    unigram   <- data.frame(token = names(unifreq), freq = unifreq)
+    saveRDS(unigram, 'Unigram.RDS')
+```
+
+Plot the top 20 unigrams with respect to their frequencies
+```{r plotting unigrams}
+    plotData  <- head(unigram, 20)
+    
+    plot <- ggplot(plotData, aes(x = reorder(token, freq), y = freq, fill = freq))
+    plot <- plot + geom_bar(stat="identity")
+    plot <- plot + theme_bw() + coord_flip() + theme(axis.title.y = element_blank())
+    plot <- plot + labs(y="Frequency", title="Most common unigrams in text sample")
+    plot
+```
+
+### Bigrams
+```{r generating bigrams}
+    biCorpus <- TermDocumentMatrix(corpus, 
+                                    control=list(tokenize = function (x) NGramTokenizer(x, 
+                                                                                        Weka_control(min = 2, 
+                                                                                                     max = 2))))
+    biCorpus <- removeSparseTerms(biCorpus, 0.999)
+    bifreq   <- sort(rowSums(as.matrix(biCorpus)), decreasing = T)
+    bigram   <- data.frame(token = names(bifreq), freq = bifreq)
+    saveRDS(bigram, 'Bigram.RDS')
+```
+
+Plot the top 20 bigrams with respect to their frequencies
+```{r plotting bigrams}
+    plotData  <- head(bigram, 20)
+    
+    plot <- ggplot(plotData, aes(x = reorder(token, freq), y = freq, fill = freq))
+    plot <- plot + geom_bar(stat="identity")
+    plot <- plot + theme_bw() + coord_flip() + theme(axis.title.y = element_blank())
+    plot <- plot + labs(y="Frequency", title="Most common bigrams in text sample")
+    plot
+```
+
+### Trigram
+```{r generating trigrams}
+    triCorpus <- TermDocumentMatrix(corpus, 
+                                    control=list(tokenize = function (x) NGramTokenizer(x, 
+                                                                                        Weka_control(min = 3, 
+                                                                                                     max = 3))))
+    triCorpus <- removeSparseTerms(triCorpus, 0.9999)
+    trifreq   <- sort(rowSums(as.matrix(triCorpus)), decreasing = T)
+    trigram   <- data.frame(token = names(trifreq), freq = trifreq)
+    saveRDS(trigram, 'trigram.RDS')
+```
+
+Plot the top 20 trigrams with respect to their frequencies
+```{r plotting trigrams}
+    plotData  <- head(trigram, 20)
+    
+    plot <- ggplot(plotData, aes(x = reorder(token, freq), y = freq, fill = freq))
+    plot <- plot + geom_bar(stat="identity")
+    plot <- plot + theme_bw() + coord_flip() + theme(axis.title.y = element_blank())
+    plot <- plot + labs(y="Frequency", title="Most common trigrams in text sample")
+    plot
+```
+
+## Next Steps
+The next step is to create a model and integrate it into a Shiny app for word prediction.
+
+### Model
+1. Use the Ngram dataframes created to calculate the probabilities of the next word.
+2. Tokenize the input string
+3. Cross Check the quadgrams, trigrams, bigrams and unigrams in the end of the input string with the Ngram dataframes in order to identify the next word.
+
+### Shiny App
+1. Integrate the model framework created above into a shiny application.
+2. Generate the Shiny App.
+3. Create a presentation for the Shiny App.
+4. Publish the presentation and the app.
