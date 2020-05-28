@@ -458,7 +458,7 @@ summary {
 </div>
 <div id="cleaning-the-datasets" class="section level2">
 <h2>Cleaning the Datasets</h2>
-<p>The datasets have a large number of values that take too much to process. Hence we sample <code>1%</code> of the data, i.e which is 3.336510^{4} lines of data which should turn a reasonable accuracy for the model.</p>
+<p>The datasets have a large number of values that take too much to process. Hence we sample <code>1%</code> of the data, i.e which is <code>33365</code> lines of data which should turn a reasonable accuracy for the model.</p>
 <pre class="r"><code>    set.seed(2020)
     trainData &lt;- c(sample(blogData, 8892), sample(newsData, 772), sample(twitterData, 23601))</code></pre>
 <pre class="r"><code>    Textprocessing &lt;- function(x){
@@ -502,7 +502,7 @@ summary {
 <div id="unigram" class="section level3">
 <h3>Unigram</h3>
 <pre class="r"><code>    uniCorpus &lt;- TermDocumentMatrix(corpus)
-    uniCorpus &lt;- removeSparseTerms(uniCorpus, 0.99)
+    uniCorpus &lt;- removeSparseTerms(uniCorpus, 0.999)
     unifreq   &lt;- sort(rowSums(as.matrix(uniCorpus)), decreasing = T)
     unigram   &lt;- data.frame(token = names(unifreq), freq = unifreq)
     saveRDS(unigram, &#39;Unigram.RDS&#39;)</code></pre>
@@ -522,7 +522,7 @@ summary {
                                     control=list(tokenize = function (x) NGramTokenizer(x, 
                                                                                         Weka_control(min = 2, 
                                                                                                      max = 2))))
-    biCorpus &lt;- removeSparseTerms(biCorpus, 0.999)
+    biCorpus &lt;- removeSparseTerms(biCorpus, 0.9999)
     bifreq   &lt;- sort(rowSums(as.matrix(biCorpus)), decreasing = T)
     bigram   &lt;- data.frame(token = names(bifreq), freq = bifreq)
     saveRDS(bigram, &#39;Bigram.RDS&#39;)</code></pre>
@@ -542,7 +542,7 @@ summary {
                                     control=list(tokenize = function (x) NGramTokenizer(x, 
                                                                                         Weka_control(min = 3, 
                                                                                                      max = 3))))
-    triCorpus &lt;- removeSparseTerms(triCorpus, 0.9999)
+    triCorpus &lt;- removeSparseTerms(triCorpus, 0.99995)
     trifreq   &lt;- sort(rowSums(as.matrix(triCorpus)), decreasing = T)
     trigram   &lt;- data.frame(token = names(trifreq), freq = trifreq)
     saveRDS(trigram, &#39;trigram.RDS&#39;)</code></pre>

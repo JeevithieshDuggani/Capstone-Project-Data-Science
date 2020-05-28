@@ -72,7 +72,7 @@ Find the number of words and lines in each dataset.
 ```
 
 ## Cleaning the Datasets
-The datasets have a large number of values that take too much to process. Hence we sample `1%` of the data, i.e which is `r 8992 + 772 + 23601` lines of data which should turn a reasonable accuracy for the model.
+The datasets have a large number of values that take too much to process. Hence we sample `1%` of the data, i.e which is `33365` lines of data which should turn a reasonable accuracy for the model.
 ```{r sampling the data}
     set.seed(2020)
     trainData <- c(sample(blogData, 8892), sample(newsData, 772), sample(twitterData, 23601))
@@ -103,18 +103,22 @@ The Cleaning of the Data is done in the following steps.
 - Remove stop words from the corpus
 - Convert the corpus to a plain text document
 ```{r cleaning the data, warning = FALSE}
-    corpus <- Corpus(VectorSource(trainData))
-    
-    corpus <- tm_map(corpus, PlainTextDocument)
-    corpus <- tm_map(corpus, tolower)
-    corpus <- tm_map(corpus, removeNumbers)
-    corpus <- tm_map(corpus, removePunctuation)
-    corpus <- tm_map(corpus, Textprocessing)
-    corpus <- tm_map(corpus, removeWords, stopwords("en"))
-    corpus <- tm_map(corpus, stripWhitespace)
-    
-    corpus <- VCorpus(VectorSource(corpus), readerControl=list(reader=readPlain, language="en"))
-    saveRDS( corpus, 'Corpus.RDS')
+    if(file.exists('Corpus.RDS')) {
+        corpus <- readRDS('Corpus.RDS')
+    } else {
+        corpus <- Corpus(VectorSource(trainData))
+        
+        corpus <- tm_map(corpus, PlainTextDocument)
+        corpus <- tm_map(corpus, tolower)
+        corpus <- tm_map(corpus, removeNumbers)
+        corpus <- tm_map(corpus, removePunctuation)
+        corpus <- tm_map(corpus, Textprocessing)
+        corpus <- tm_map(corpus, removeWords, stopwords("en"))
+        corpus <- tm_map(corpus, stripWhitespace)
+        
+        corpus <- VCorpus(VectorSource(corpus), readerControl=list(reader=readPlain, language="en"))
+        saveRDS( corpus, 'Corpus.RDS')
+    }
 ```
 
 ## NGram Creation
@@ -122,11 +126,15 @@ Inorder to generate predicition we need to train the model on unigrams, bigrams 
 
 ### Unigram
 ```{r generating unigrams}
-    uniCorpus <- TermDocumentMatrix(corpus)
-    uniCorpus <- removeSparseTerms(uniCorpus, 0.99)
-    unifreq   <- sort(rowSums(as.matrix(uniCorpus)), decreasing = T)
-    unigram   <- data.frame(token = names(unifreq), freq = unifreq)
-    saveRDS(unigram, 'Unigram.RDS')
+    if(file.exists('Unigram.RDS')) {
+        unigram <- readRDS('Unigram.RDS')
+    } else {
+        uniCorpus <- TermDocumentMatrix(corpus)
+        uniCorpus <- removeSparseTerms(uniCorpus, 0.999)
+        unifreq   <- sort(rowSums(as.matrix(uniCorpus)), decreasing = T)
+        unigram   <- data.frame(token = names(unifreq), freq = unifreq)
+        saveRDS(unigram, 'Unigram.RDS')
+    }
 ```
 
 Plot the top 20 unigrams with respect to their frequencies
@@ -142,14 +150,18 @@ Plot the top 20 unigrams with respect to their frequencies
 
 ### Bigrams
 ```{r generating bigrams}
-    biCorpus <- TermDocumentMatrix(corpus, 
-                                    control=list(tokenize = function (x) NGramTokenizer(x, 
-                                                                                        Weka_control(min = 2, 
-                                                                                                     max = 2))))
-    biCorpus <- removeSparseTerms(biCorpus, 0.999)
-    bifreq   <- sort(rowSums(as.matrix(biCorpus)), decreasing = T)
-    bigram   <- data.frame(token = names(bifreq), freq = bifreq)
-    saveRDS(bigram, 'Bigram.RDS')
+    if(file.exists('Bigram.RDS')) {
+        unigram <- readRDS('Bigram.RDS')
+    } else {
+        biCorpus <- TermDocumentMatrix(corpus, 
+                                        control=list(
+                                            tokenize = function (x) NGramTokenizer(x, Weka_control(min = 2, 
+                                                                                                   max = 2))))
+        biCorpus <- removeSparseTerms(biCorpus, 0.999)
+        bifreq   <- sort(rowSums(as.matrix(biCorpus)), decreasing = T)
+        bigram   <- data.frame(token = names(bifreq), freq = bifreq)
+        saveRDS(bigram, 'Bigram.RDS')
+    }
 ```
 
 Plot the top 20 bigrams with respect to their frequencies
@@ -165,14 +177,18 @@ Plot the top 20 bigrams with respect to their frequencies
 
 ### Trigram
 ```{r generating trigrams}
-    triCorpus <- TermDocumentMatrix(corpus, 
-                                    control=list(tokenize = function (x) NGramTokenizer(x, 
-                                                                                        Weka_control(min = 3, 
-                                                                                                     max = 3))))
-    triCorpus <- removeSparseTerms(triCorpus, 0.9999)
-    trifreq   <- sort(rowSums(as.matrix(triCorpus)), decreasing = T)
-    trigram   <- data.frame(token = names(trifreq), freq = trifreq)
-    saveRDS(trigram, 'trigram.RDS')
+    if(file.exists('Trigram.RDS')) {
+        unigram <- readRDS('Trigram.RDS')
+    } else {
+        triCorpus <- TermDocumentMatrix(corpus, 
+                                        control=list(
+                                            tokenize = function (x) NGramTokenizer(x, Weka_control(min = 3, 
+                                                                                                   max = 3))))
+        triCorpus <- removeSparseTerms(triCorpus, 0.9999)
+        trifreq   <- sort(rowSums(as.matrix(triCorpus)), decreasing = T)
+        trigram   <- data.frame(token = names(trifreq), freq = trifreq)
+        saveRDS(trigram, 'trigram.RDS')
+    }
 ```
 
 Plot the top 20 trigrams with respect to their frequencies
